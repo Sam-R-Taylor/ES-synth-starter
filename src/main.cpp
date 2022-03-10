@@ -81,12 +81,21 @@ void setup() {
 
 
 uint8_t readCols(){
+  digitalWrite(RA2_PIN, LOW);
+  digitalWrite(RA1_PIN, LOW);
+  digitalWrite(RA0_PIN, LOW);
+  digitalWrite(REN_PIN, HIGH);
+
   uint8_t C0 = digitalRead(C0_PIN);
   uint8_t C1 = digitalRead(C1_PIN);
   uint8_t C2 = digitalRead(C2_PIN);
   uint8_t C3 = digitalRead(C3_PIN);
   uint8_t funcOut = (C3 << 3 ) | (C2 << 2) | (C1 << 1) | (C0) ; 
   return funcOut ; 
+}
+
+void initialiseRow(uint8_t rowIndex){
+  digitalWrite(REN_PIN, LOW);
 }
 
 
