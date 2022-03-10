@@ -90,7 +90,7 @@ uint8_t readCols(){
   uint8_t C1 = digitalRead(C1_PIN);
   uint8_t C2 = digitalRead(C2_PIN);
   uint8_t C3 = digitalRead(C3_PIN);
-  uint8_t funcOut = (C3 << 3 ) | (C2 << 2) | (C1 << 1) | (C0) ; 
+  uint8_t funcOut = (C0) | (C1 << 1) | (C2 << 2) | (C3 << 3 ) ; 
   return funcOut ; 
 }
 
@@ -111,11 +111,14 @@ void loop() {
     u8g2.clearBuffer();         // clear the internal memory
     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
     u8g2.drawStr(2,10,"Helllo World!");  // write something to the internal memory
+    uint8_t keys = readCols();
     u8g2.setCursor(2,20);
-    u8g2.print(count++);
+    u8g2.print(keys,HEX);
     u8g2.sendBuffer();          // transfer internal memory to the display
 
     //Toggle LED
     digitalToggle(LED_BUILTIN);
   }
+
+
 }
