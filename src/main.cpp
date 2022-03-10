@@ -79,6 +79,17 @@ void setup() {
   Serial.println("Hello World");
 }
 
+
+uint8_t readCols(){
+  uint8_t C0 = digitalRead(C0_PIN);
+  uint8_t C1 = digitalRead(C1_PIN);
+  uint8_t C2 = digitalRead(C2_PIN);
+  uint8_t C3 = digitalRead(C3_PIN);
+  uint8_t funcOut = (C3 << 3 ) | (C2 << 2) | (C1 << 1) | (C0) ; 
+  return funcOut ; 
+}
+
+
 void loop() {
   // put your main code here, to run repeatedly:
   static uint32_t next = millis();
