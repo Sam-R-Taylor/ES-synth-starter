@@ -35,6 +35,14 @@
 //Display driver object
 U8G2_SSD1305_128X32_NONAME_F_HW_I2C u8g2(U8G2_R0);
 
+//Key Constant
+uint8_t keyArray[7];
+
+//Generating Sound  vars/consts
+const int32_t stepSizes [] = {51076056, 54113197, 57330935, 60740010, 64351798, 68178356, 72232452, 76527617, 81078186, 85899345, 91007186, 96418755};
+const char* notes[13] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", " "};
+volatile int32_t currentStepSize;
+
 //Function to set outputs using key matrix
 void setOutMuxBit(const uint8_t bitIdx, const bool value) {
       digitalWrite(REN_PIN,LOW);
@@ -89,6 +97,88 @@ uint8_t readCols(){
   return funcOut ; 
 }
 
+int keyState(uint8_t * keyArray){
+  switch(keyArray[0]){
+    case 0xE:
+      currentStepSize = stepSizes[0];  
+      return 0 ; 
+      break;
+
+    case 0xD:
+      currentStepSize = stepSizes[1];
+      return 1;
+      break;
+
+    case 0xB:
+      currentStepSize = stepSizes[2];
+      return 2;
+      break;   
+
+    case 0x7:
+      currentStepSize = stepSizes[3];
+      return 3;
+      break;
+
+    default:
+      break;
+         
+  }
+
+  switch(keyArray[1]){
+    case 0xE:
+      currentStepSize = stepSizes[4];
+      return 4;
+      break;
+
+    case 0xD:
+      currentStepSize = stepSizes[5];
+      return 5;
+      break;
+
+    case 0xB:
+      currentStepSize = stepSizes[6];
+      return 6;
+      break;
+
+    case 0x7:
+      currentStepSize = stepSizes[7];
+      return 7;
+      break;
+    
+    default:
+      break;    
+  }
+
+  switch(keyArray[2]){
+    case 0xE:
+      return 8;
+      currentStepSize = stepSizes[8];
+      break;
+
+    case 0xD:
+      currentStepSize = stepSizes[9];
+      return 9;
+      break;
+
+    case 0xB:
+      currentStepSize = stepSizes[10];
+      return 10;
+      break;
+
+    case 0x7:
+      currentStepSize = stepSizes[11];
+      return 11;
+      
+      break;
+
+    default:
+      return 12;
+      break;    
+  }
+  
+  
+}
+
 void setRow(uint8_t rowIdx){
   digitalWrite(REN_PIN, LOW);
 
@@ -118,7 +208,6 @@ void loop() {
   static uint32_t count = 0;
 
   //Reading Array
-  uint8_t keyArray[7];
   uint8_t keys ;
 
   if (millis() > next) 
@@ -140,9 +229,15 @@ void loop() {
     }
 
     uint16_t keyOut = (keyArray[0]) | (keyArray[1] << 4 ) | (keyArray[2] << 8 ) ; 
+    uint8_t noteIdx = keyState(keyArray);
     
     u8g2.setCursor(2,20);
     u8g2.print(keyOut,HEX);
+
+    //Note Played
+    u8g2.setCursor(2,30);
+    u8g2.print(notes[noteIdx]);
+
     u8g2.sendBuffer();          // transfer internal memory to the display
 
     //Toggle LED
