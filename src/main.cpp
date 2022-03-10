@@ -81,11 +81,6 @@ void setup() {
 
 
 uint8_t readCols(){
-  digitalWrite(RA2_PIN, LOW);
-  digitalWrite(RA1_PIN, LOW);
-  digitalWrite(RA0_PIN, LOW);
-  digitalWrite(REN_PIN, HIGH);
-
   uint8_t C0 = digitalRead(C0_PIN);
   uint8_t C1 = digitalRead(C1_PIN);
   uint8_t C2 = digitalRead(C2_PIN);
@@ -94,8 +89,26 @@ uint8_t readCols(){
   return funcOut ; 
 }
 
-void initialiseRow(uint8_t rowIndex){
+void setRow(uint8_t rowIdx){
   digitalWrite(REN_PIN, LOW);
+
+  if ((rowIdx) == 0){
+  digitalWrite(RA2_PIN, LOW);
+  digitalWrite(RA1_PIN, LOW);
+  digitalWrite(RA0_PIN, LOW);
+  }
+   if ((rowIdx) == 1){
+  digitalWrite(RA2_PIN, LOW);
+  digitalWrite(RA1_PIN, LOW);
+  digitalWrite(RA0_PIN, HIGH);
+  }
+   if ((rowIdx) == 2){
+  digitalWrite(RA2_PIN, LOW);
+  digitalWrite(RA1_PIN, HIGH);
+  digitalWrite(RA0_PIN, LOW);
+  }
+
+  digitalWrite(REN_PIN, HIGH);
 }
 
 
@@ -104,16 +117,32 @@ void loop() {
   static uint32_t next = millis();
   static uint32_t count = 0;
 
-  if (millis() > next) {
+  //Reading Array
+  uint8_t keyArray[7];
+  uint8_t keys ;
+
+  if (millis() > next) 
+  {
     next += interval;
 
     //Update display
     u8g2.clearBuffer();         // clear the internal memory
     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
     u8g2.drawStr(2,10,"Helllo World!");  // write something to the internal memory
-    uint8_t keys = readCols();
+    
+    for(int i ; i < 3 ; i++)
+    {
+      setRow(i);
+      delayMicroseconds(3);
+      uint8_t keys = readCols();
+      keyArray[i] = keys;
+      
+    }
+
+    uint16_t keyOut = (keyArray[0]) | (keyArray[1] << 4 ) | (keyArray[2] << 8 ) ; 
+    
     u8g2.setCursor(2,20);
-    u8g2.print(keys,HEX);
+    u8g2.print(keyOut,HEX);
     u8g2.sendBuffer();          // transfer internal memory to the display
 
     //Toggle LED
