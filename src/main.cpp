@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
+#include <STM32FreeRTOS.h>
 
 //Constants
   const uint32_t interval = 100; //Display update interval
@@ -39,8 +40,8 @@ U8G2_SSD1305_128X32_NONAME_F_HW_I2C u8g2(U8G2_R0);
 uint8_t keyArray[7];
 
 //Generating Sound  vars/consts
-const int32_t stepSizes [] = {51076056, 54113197, 57330935, 60740010, 64351798, 68178356, 72232452, 76527617, 81078186, 85899345, 91007186, 96418755};
-const char* notes[13] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", " "};
+const static int32_t STEPSIZES [] = {51076056, 54113197, 57330935, 60740010, 64351798, 68178356, 72232452, 76527617, 81078186, 85899345, 91007186, 96418755};
+const static char* NOTES[13] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", " "};
 volatile int32_t currentStepSize;
 
 //Function to set outputs using key matrix
@@ -54,6 +55,17 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
       delayMicroseconds(2);
       digitalWrite(REN_PIN,LOW);
 }
+
+void sampleISR(){
+  static int32_t phaseAcc = 0;
+  phaseAcc += currentStepSize;
+  int32_t Vout = phaseAcc >> 24;
+  analogWrite(OUTR_PIN, Vout + 128);
+}
+
+void scanKeysTask(void * pvParameters);
+
+void displayUpdateTask(void * pvParameters);
 
 void setup() {
   // put your setup code here, to run once:
@@ -85,8 +97,25 @@ void setup() {
   //Initialise UART
   Serial.begin(9600);
   Serial.println("Hello World");
-}
 
+  //Timer Interrupt 
+  TIM_TypeDef *Instance = TIM1;
+  HardwareTimer *sampleTimer= new HardwareTimer(Instance);
+  sampleTimer->setOverflow(22000, HERTZ_FORMAT);
+  sampleTimer->attachInterrupt(sampleISR);
+  sampleTimer->resume();
+
+  TaskHandle_t scanKeysHandle = NULL;
+  xTaskCreate(scanKeysTask, /* Function that implements the task */
+                 "scanKeys", /* Text name for the task */
+                 64,         /* Stack size in words, not bytes*/
+                 NULL,       /* Parameter passed into the task */
+                 1,          /* Task priority*/
+                 &scanKeysHandle);
+  
+  vTaskStartScheduler();
+
+}
 
 uint8_t readCols(){
   uint8_t C0 = digitalRead(C0_PIN);
@@ -95,88 +124,6 @@ uint8_t readCols(){
   uint8_t C3 = digitalRead(C3_PIN);
   uint8_t funcOut = (C0) | (C1 << 1) | (C2 << 2) | (C3 << 3 ) ; 
   return funcOut ; 
-}
-
-int keyState(uint8_t * keyArray){
-  switch(keyArray[0]){
-    case 0xE:
-      currentStepSize = stepSizes[0];  
-      return 0 ; 
-      break;
-
-    case 0xD:
-      currentStepSize = stepSizes[1];
-      return 1;
-      break;
-
-    case 0xB:
-      currentStepSize = stepSizes[2];
-      return 2;
-      break;   
-
-    case 0x7:
-      currentStepSize = stepSizes[3];
-      return 3;
-      break;
-
-    default:
-      break;
-         
-  }
-
-  switch(keyArray[1]){
-    case 0xE:
-      currentStepSize = stepSizes[4];
-      return 4;
-      break;
-
-    case 0xD:
-      currentStepSize = stepSizes[5];
-      return 5;
-      break;
-
-    case 0xB:
-      currentStepSize = stepSizes[6];
-      return 6;
-      break;
-
-    case 0x7:
-      currentStepSize = stepSizes[7];
-      return 7;
-      break;
-    
-    default:
-      break;    
-  }
-
-  switch(keyArray[2]){
-    case 0xE:
-      return 8;
-      currentStepSize = stepSizes[8];
-      break;
-
-    case 0xD:
-      currentStepSize = stepSizes[9];
-      return 9;
-      break;
-
-    case 0xB:
-      currentStepSize = stepSizes[10];
-      return 10;
-      break;
-
-    case 0x7:
-      currentStepSize = stepSizes[11];
-      return 11;
-      
-      break;
-
-    default:
-      return 12;
-      break;    
-  }
-  
-  
 }
 
 void setRow(uint8_t rowIdx){
@@ -201,24 +148,81 @@ void setRow(uint8_t rowIdx){
   digitalWrite(REN_PIN, HIGH);
 }
 
+int keyState(uint8_t * keyArray){
+  switch(keyArray[0]){
+    case 0xE:
+      return 0 ; 
+      break;
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  static uint32_t next = millis();
-  static uint32_t count = 0;
+    case 0xD:
+      return 1;
+      break;
 
-  //Reading Array
-  uint8_t keys ;
+    case 0xB:
+      return 2;
+      break;   
 
-  if (millis() > next) 
-  {
-    next += interval;
+    case 0x7:
+      return 3;
+      break;
 
-    //Update display
-    u8g2.clearBuffer();         // clear the internal memory
-    u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-    u8g2.drawStr(2,10,"Helllo World!");  // write something to the internal memory
+    default:
+      break;
+         
+  }
+
+  switch(keyArray[1]){
+    case 0xE:
+      return 4;
+      break;
+
+    case 0xD:
+      return 5;
+      break;
+
+    case 0xB:
+      return 6;
+      break;
+
+    case 0x7:
+      return 7;
+      break;
     
+    default:
+      break;    
+  }
+
+  switch(keyArray[2]){
+    case 0xE:
+      return 8;
+      break;
+
+    case 0xD:
+      return 9;
+      break;
+
+    case 0xB:
+      return 10;
+      break;
+
+    case 0x7:
+      return 11;
+      
+      break;
+
+    default:
+      return 12;
+      break;    
+  }
+  
+  
+}
+
+void scanKeysTask(void * pvParameters) {
+    const TickType_t xFrequency = 50/portTICK_PERIOD_MS;
+    TickType_t xLastWakeTime= xTaskGetTickCount();
+    while (true){
+    vTaskDelayUntil( &xLastWakeTime, xFrequency ); //Go Here or at the end of loop? Test
     for(int i ; i < 3 ; i++)
     {
       setRow(i);
@@ -228,21 +232,43 @@ void loop() {
       
     }
 
-    uint16_t keyOut = (keyArray[0]) | (keyArray[1] << 4 ) | (keyArray[2] << 8 ) ; 
-    uint8_t noteIdx = keyState(keyArray);
+    uint16_t keyOut = (keyArray[2] << 8 ) | (keyArray[1] << 4 ) |  (keyArray[0]) ; 
+    uint8_t Idx = keyState(keyArray);
+    int32_t localCurrentStepSize = STEPSIZES[Idx] ; 
+
+    __atomic_store_n(&currentStepSize,localCurrentStepSize,__ATOMIC_RELAXED);
+    }
+}
+
+void loop() {
+  // // put your main code here, to run repeatedly:
+  // static uint32_t next = millis();
+  // static uint32_t count = 0;
+
+  // //Reading Array
+  // uint8_t keys ;
+
+  // if (millis() > next) 
+  // {
+  //   next += interval;
+
+  //   //Update display
+  //   u8g2.clearBuffer();         // clear the internal memory
+  //   u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+  //   u8g2.drawStr(2,10,"Helllo World!");  // write something to the internal memory
     
-    u8g2.setCursor(2,20);
-    u8g2.print(keyOut,HEX);
+  //   scanKeysTask();
 
-    //Note Played
-    u8g2.setCursor(2,30);
-    u8g2.print(notes[noteIdx]);
+  //   u8g2.setCursor(2,20);
+  //   u8g2.print(keyOut,HEX);
 
-    u8g2.sendBuffer();          // transfer internal memory to the display
+  //   //Note Played
+  //   u8g2.setCursor(2,30);
+  //   u8g2.print(NOTES[noteIdx]);
 
-    //Toggle LED
-    digitalToggle(LED_BUILTIN);
-  }
+  //   u8g2.sendBuffer();          // transfer internal memory to the display
 
-
+  //   //Toggle LED
+  //   digitalToggle(LED_BUILTIN);
+  // }
 }
