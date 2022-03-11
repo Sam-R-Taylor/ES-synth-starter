@@ -40,9 +40,15 @@ U8G2_SSD1305_128X32_NONAME_F_HW_I2C u8g2(U8G2_R0);
 uint8_t keyArray[7];
 
 //Generating Sound  vars/consts
-const static int32_t STEPSIZES [] = {51076056, 54113197, 57330935, 60740010, 64351798, 68178356, 72232452, 76527617, 81078186, 85899345, 91007186, 96418755};
+const static int32_t STEPSIZES[13] = {51076056, 54113197, 57330935, 60740010, 64351798, 68178356, 72232452, 76527617, 81078186, 85899345, 91007186, 96418755,0};
 const static char* NOTES[13] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", " "};
 volatile int32_t currentStepSize;
+
+void scanKeysTask(void * pvParameters);
+
+void displayUpdateTask(void * pvParameters);
+
+void sampleISR();
 
 //Function to set outputs using key matrix
 void setOutMuxBit(const uint8_t bitIdx, const bool value) {
@@ -56,16 +62,6 @@ void setOutMuxBit(const uint8_t bitIdx, const bool value) {
       digitalWrite(REN_PIN,LOW);
 }
 
-void sampleISR(){
-  static int32_t phaseAcc = 0;
-  phaseAcc += currentStepSize;
-  int32_t Vout = phaseAcc >> 24;
-  analogWrite(OUTR_PIN, Vout + 128);
-}
-
-void scanKeysTask(void * pvParameters);
-
-void displayUpdateTask(void * pvParameters);
 
 void setup() {
   // put your setup code here, to run once:
@@ -94,11 +90,7 @@ void setup() {
   u8g2.begin();
   setOutMuxBit(DEN_BIT, HIGH);  //Enable display power supply
 
-  //Initialise UART
-  Serial.begin(9600);
-  Serial.println("Hello World");
-
-  //Timer Interrupt 
+  //ISR
   TIM_TypeDef *Instance = TIM1;
   HardwareTimer *sampleTimer= new HardwareTimer(Instance);
   sampleTimer->setOverflow(22000, HERTZ_FORMAT);
@@ -112,9 +104,32 @@ void setup() {
                  NULL,       /* Parameter passed into the task */
                  1,          /* Task priority*/
                  &scanKeysHandle);
-  
+
+  TaskHandle_t displayUpdateHandle = NULL;      
+  xTaskCreate(displayUpdateTask, /* Function that implements the task */
+                 "displayUpdate", /* Text name for the task */
+                 256,         /* Stack size in words, not bytes*/
+                 NULL,       /* Parameter passed into the task */
+                 1,          /* Task priority*/
+                 &displayUpdateHandle );
+        
+
+  //Initialise UART
+  Serial.begin(9600);
+  Serial.println("Hello World");
+
   vTaskStartScheduler();
 
+}
+
+void loop() {
+}
+
+void sampleISR(){
+  static int32_t phaseAcc = 0;
+  phaseAcc += currentStepSize;
+  int32_t Vout = phaseAcc >> 24;
+  analogWrite(OUTR_PIN, Vout + 128);
 }
 
 uint8_t readCols(){
@@ -221,8 +236,10 @@ int keyState(uint8_t * keyArray){
 void scanKeysTask(void * pvParameters) {
     const TickType_t xFrequency = 50/portTICK_PERIOD_MS;
     TickType_t xLastWakeTime= xTaskGetTickCount();
-    while (true){
-    vTaskDelayUntil( &xLastWakeTime, xFrequency ); //Go Here or at the end of loop? Test
+
+  while(true){
+    vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
+    
     for(int i ; i < 3 ; i++)
     {
       setRow(i);
@@ -232,43 +249,37 @@ void scanKeysTask(void * pvParameters) {
       
     }
 
-    uint16_t keyOut = (keyArray[2] << 8 ) | (keyArray[1] << 4 ) |  (keyArray[0]) ; 
     uint8_t Idx = keyState(keyArray);
     int32_t localCurrentStepSize = STEPSIZES[Idx] ; 
 
     __atomic_store_n(&currentStepSize,localCurrentStepSize,__ATOMIC_RELAXED);
-    }
+
+    
+  }
 }
 
-void loop() {
-  // // put your main code here, to run repeatedly:
-  // static uint32_t next = millis();
-  // static uint32_t count = 0;
+void displayUpdateTask(void * pvParameters){
+  const TickType_t xFrequency = 100/portTICK_PERIOD_MS;
+  TickType_t xLastWakeTime= xTaskGetTickCount();
 
-  // //Reading Array
-  // uint8_t keys ;
-
-  // if (millis() > next) 
-  // {
-  //   next += interval;
-
-  //   //Update display
-  //   u8g2.clearBuffer();         // clear the internal memory
-  //   u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
-  //   u8g2.drawStr(2,10,"Helllo World!");  // write something to the internal memory
+  while (true){
+     vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
+     u8g2.clearBuffer();         // clear the internal memory
+     u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
+     u8g2.drawStr(2,10,"Music Synthesiser!");  // write something to the internal memory
     
-  //   scanKeysTask();
+     u8g2.setCursor(2,20);
+     u8g2.print(currentStepSize,DEC);
 
-  //   u8g2.setCursor(2,20);
-  //   u8g2.print(keyOut,HEX);
+     uint16_t keyOut = (keyArray[2] << 8 ) | (keyArray[1] << 4 ) |  (keyArray[0]) ; 
+     u8g2.setCursor(2,30);
+     u8g2.print(keyOut,HEX);
 
-  //   //Note Played
-  //   u8g2.setCursor(2,30);
-  //   u8g2.print(NOTES[noteIdx]);
+     u8g2.sendBuffer();          // transfer internal memory to the display
 
-  //   u8g2.sendBuffer();          // transfer internal memory to the display
+     //Toggle LED
+     //digitalToggle(LED_BUILTIN);
 
-  //   //Toggle LED
-  //   digitalToggle(LED_BUILTIN);
-  // }
+     //vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
+    }
 }
