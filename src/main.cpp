@@ -238,7 +238,9 @@ void scanKeysTask(void * pvParameters) {
     TickType_t xLastWakeTime= xTaskGetTickCount();
 
   while(true){
-    vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
+    vTaskDelay(1);
+    //vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
+    Serial.println("ScanKeysLoop");
     
     for(int i ; i < 3 ; i++)
     {
@@ -263,6 +265,8 @@ void displayUpdateTask(void * pvParameters){
   TickType_t xLastWakeTime= xTaskGetTickCount();
 
   while (true){
+     vTaskDelay(1);
+     Serial.println("DisplayUpdateLoop");
      vTaskDelayUntil( &xLastWakeTime, xFrequency ); 
      u8g2.clearBuffer();         // clear the internal memory
      u8g2.setFont(u8g2_font_ncenB08_tr); // choose a suitable font
